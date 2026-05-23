@@ -1,0 +1,15 @@
+flask
+flask-cors
+opencv-python-headless
+torch --extra-index-url https://pytorch.org
+torchvision --extra-index-url https://pytorch.org
+ultralytics
+pandas
+tqdm
+PyYAML
+seaborn
+Pillow
+requests
+psutil
+scipy
+matplotlib

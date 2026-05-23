@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Package Damage Analyzer</title>
+    <style>
+        /* Modern Dark Theme Styling */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background: #121214;
+            color: #e4e4e7;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Dashboard Container */
+        .dashboard {
+            background: #1c1c1f;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            max-width: 700px;
+            width: 90%;
+            border: 1px solid #2e2e33;
+        }
+
+        h1 { margin: 0 0 10px 0; color: #ff4757; font-size: 32px; }
+        p { color: #a1a1aa; font-size: 16px; margin-bottom: 30px; line-height: 1.5; }
+
+        /* Action Button */
+        .btn-start {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(255, 71, 87, 0.3);
+        }
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(255, 71, 87, 0.5);
+        }
+
+        /* Video Stream Container (Shuru me hidden rahega) */
+        .camera-container {
+            display: none; /* Hidden by default */
+            position: relative;
+            width: 640px;
+            height: 480px;
+            margin-top: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #ff4757;
+            background: #000;
+        }
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 640px;
+            height: 480px;
+        }
+        canvas { z-index: 5; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <h1>📦 AI Package Damage Analyzer</h1>
+        <p>Real-time machine learning solution to detect and analyze shipping package damages instantly using warehouse cameras.</p>
+        
+        <!-- Welcome Button -->
+        <button id="startBtn" class="btn-start" onclick="initiateCamera()">Detect Damage Package</button>
+
+        <!-- Camera Section (Click karne par khulega) -->
+        <div id="cameraSection" class="camera-container">
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="overlay"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const cameraSection = document.getElementById('cameraSection');
+
+        function initiateCamera() {
+            // Button ko gayab karo aur camera section ko show karo
+            startBtn.style.display = 'none';
+            cameraSection.style.display = 'block';
+
+            // Webcam stream start karo
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+                .then(stream => { 
+                    video.srcObject = stream; 
+                })
+                .catch(err => {
+                    alert("Camera access nahi mila! Permission check karein.");
+                    console.error(err);
+                });
+        }
+
+        video.addEventListener('play', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            // Har 0.3 second me frame analyze hoga
+            setInterval(captureAndAnalyze, 300);
+        });
+
+        function captureAndAnalyze() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const base64Image = tempCanvas.toDataURL('image/jpeg', 0.6);
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64Image })
+            })
+            .then(res => res.json())
+            .then(predictions => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                predictions.forEach(pred => {
+                    if (pred.confidence > 0.15) { // Adjusted Confidence filter
+                        ctx.strokeStyle = '#ff4757';
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(pred.xmin, pred.ymin, pred.xmax - pred.xmin, pred.ymax - pred.ymin);
+                        
+                        ctx.fillStyle = '#ff4757';
+                        ctx.font = 'bold 16px sans-serif';
+                        const label = `${pred.name} ${Math.round(pred.confidence * 100)}%`;
+                        ctx.fillText(label, pred.xmin, pred.ymin - 8);
+                    }
+                });
+            })
+            .catch(err => console.error("Error sending frame:", err));
+        }
+    </script>
+</body>
+</html>
